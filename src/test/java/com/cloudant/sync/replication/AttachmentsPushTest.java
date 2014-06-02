@@ -26,6 +26,7 @@ import org.hamcrest.CoreMatchers;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -195,6 +196,43 @@ public class AttachmentsPushTest extends ReplicationTestBase {
         Assert.assertTrue("Attachment not the same", TestUtils.streamsEqual(isRev4Att1, isOriginal1));
         Assert.assertTrue("Attachment not the same", TestUtils.streamsEqual(isRev4Att2, isOriginal2));
 
+    }
+
+    @Test
+    @Ignore
+    public void pushAttachmentsTestMissingStub() throws Exception {
+        // more complex test with attachments changing between revisions
+        String attachmentName1 = "attachment_1.txt";
+        String attachmentName2 = "attachment_2.txt";
+        populateSomeDataInLocalDatastore();
+        File f1 = new File("fixture", attachmentName1);
+        File f2 = new File("fixture", attachmentName2);
+        Attachment att1 = new UnsavedFileAttachment(f1, "text/plain");
+        Attachment att2 = new UnsavedFileAttachment(f2, "text/plain");
+        List<Attachment> atts1 = new ArrayList<Attachment>();
+        atts1.add(att1);
+        atts1.add(att2);
+        DocumentRevision rev1 = datastore.getDocument(id1);
+        DocumentRevision rev2 = null;
+        try {
+            // set attachment
+            rev2 = datastore.updateAttachments(rev1, atts1);
+        } catch (IOException ioe) {
+            Assert.fail("IOException thrown: "+ioe);
+        }
+
+        // push replication - att1 should be uploaded
+        push();
+
+        // remove attachment
+        DocumentRevision rev3 = datastore.removeAttachments(rev2, new String[]{attachmentName1});
+
+        // change revpos
+        this.database.execSQL(String.format("UPDATE attachments SET revpos=1 WHERE filename='%s'", attachmentName2));
+        // push replication - currently fails with missing_stub CouchException
+        push();
+
+        // TODO check attachments
     }
 
     private void push() throws Exception {
