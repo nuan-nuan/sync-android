@@ -25,7 +25,7 @@ This library is for Android and Java SE; an [iOS][ios] version is also available
 
 [ios]: https://github.com/cloudant/CDTDatastore
 
-If you have questions, please join our [mailing list][mlist] and drop us a 
+If you have questions, please join our [mailing list][mlist] and drop us a
 line.
 
 [mlist]: https://groups.google.com/forum/#!forum/cloudant-sync
@@ -38,10 +38,11 @@ a dependency via [maven][maven] or [gradle][gradle].
 [maven]: http://maven.apache.org/
 [gradle]: http://www.gradle.org/
 
-There are currently three jar files for the datastore:
+There are currently four jar files for the datastore:
 
 * `cloudant-sync-datastore-core`: the main datastore classes.
 * `cloudant-sync-datastore-android`: Android specific classes.
+* `cloudant-sync-datastore-android-encryption`: Android encryption specific classes.
 * `cloudant-sync-datastore-javase`: Java SE specific classes.
 
 ### Gradle
@@ -57,11 +58,15 @@ repositories {
 
 dependencies {
     // Other dependencies
-    compile group: 'com.cloudant', name: 'cloudant-sync-datastore-core', version:'0.9.0'
-    // include this if you're targeting Android
-    compile group: 'com.cloudant', name: 'cloudant-sync-datastore-android', version:'0.9.0'
+    compile group: 'com.cloudant', name: 'cloudant-sync-datastore-core', version:'0.14.0'
+    // include this if you're targeting Android. If you also want datastore encryption
+    // you will need to include cloudant-sync-datastore-android-encryption as well (see below).
+    compile group: 'com.cloudant', name: 'cloudant-sync-datastore-android', version:'0.14.0'
+    // include this if you're targeting Android and want datastore encryption. You will also need
+    // cloudant-sync-datastore-android (see above).
+    compile group: 'com.cloudant', name: 'cloudant-sync-datastore-android-encryption', version:'0.14.0'
     // include this if you're targeting Java SE
-    compile group: 'com.cloudant', name: 'cloudant-sync-datastore-javase', version:'0.9.0'
+    compile group: 'com.cloudant', name: 'cloudant-sync-datastore-javase', version:'0.14.0'
 }
 ```
 
@@ -91,21 +96,30 @@ It's a similar story in maven, add the repo and the dependency:
     <dependency>
       <groupId>com.cloudant</groupId>
       <artifactId>cloudant-sync-datastore-core</artifactId>
-      <version>0.9.0</version>
+      <version>0.14.0</version>
       <scope>compile</scope>
     </dependency>
-    <!-- include this if you're targeting Android -->
+    <!-- include this if you're targeting Android. If you also want datastore encryption
+         you will need to include cloudant-sync-datastore-android-encryption as well (see below). -->
     <dependency>
       <groupId>com.cloudant</groupId>
       <artifactId>cloudant-sync-datastore-android</artifactId>
-      <version>0.9.0</version>
+      <version>0.14.0</version>
+      <scope>compile</scope>
+    </dependency>
+    <!-- include this if you're targeting Android and want datastore encryption. You will also need
+         cloudant-sync-datastore-android (see above). -->
+    <dependency>
+      <groupId>com.cloudant</groupId>
+      <artifactId>cloudant-sync-datastore-android-encryption</artifactId>
+      <version>0.14.0</version>
       <scope>compile</scope>
     </dependency>
     <!-- include this if you're targeting Java SE -->
     <dependency>
       <groupId>com.cloudant</groupId>
       <artifactId>cloudant-sync-datastore-javase</artifactId>
-      <version>0.9.0</version>
+      <version>0.14.0</version>
       <scope>compile</scope>
     </dependency>
   </dependencies>
@@ -117,6 +131,23 @@ _Note_: Older versions than 0.3.0 had a separate Mazha jar. This was rolled
 into the main jar for distribution simplicity. The dependency needs removing
 from gradle and maven build files.
 
+## Tested Platforms
+
+The library is regularly tested on the following platforms:
+
+Android (via emulator):
+
+* API Level 15
+* API Level 16
+* API Level 17
+* API Level 18
+* API Level 19
+* API Level 21
+
+Java:
+
+* 1.8 (Java 8)
+
 ## Example application
 
 There is a [sample application and a quickstart guide](/sample/).
@@ -127,29 +158,37 @@ Once the libraries are added to a project, the basics of adding and reading
 a document are:
 
 ```java
+import com.cloudant.sync.datastore.BasicDocumentRevision;
 import com.cloudant.sync.datastore.DatastoreManager;
 import com.cloudant.sync.datastore.Datastore;
+import com.cloudant.sync.datastore.DatastoreNotCreatedException;
+import com.cloudant.sync.datastore.DocumentBodyFactory;
+import com.cloudant.sync.datastore.DocumentException;
+import com.cloudant.sync.datastore.MutableDocumentRevision;
+import com.cloudant.sync.datastore.UnsavedFileAttachment;
 
 // Create a DatastoreManager using application internal storage path
-File path = getApplicationContext().getDir("datastores");
+File path = getApplicationContext().getDir("datastores", Context.MODE_PRIVATE);
 DatastoreManager manager = new DatastoreManager(path.getAbsolutePath());
 
 Datastore ds = manager.openDatastore("my_datastore");
 
 // Create a document
-DocumentBody body = new BasicDBBody(jsonData);
 MutableDocumentRevision revision = new MutableDocumentRevision();
-revision.body = body;
-DocumentRevision saved = ds.createDocumentFromRevision(revision);
+Map<String, Object> body = new HashMap<String, Object>();
+body.put("animal", "cat");
+revision.body = DocumentBodyFactory.create(body);
+BasicDocumentRevision saved = ds.createDocumentFromRevision(revision);
 
 // Add an attachment -- binary data like a JPEG
+MutableDocumentRevision update = saved.mutableCopy();  // BasicDocumentRevision is readonly
 UnsavedFileAttachment att1 = new UnsavedFileAttachment(new File("/path/to/image.jpg"),
                                                        "image/jpeg");
-revision.attachments.put(att1.name, att1);
-DocumentRevision updated = ds.createDocumentFromRevision(revision);
+update.attachments.put(att1.name, att1);
+BasicDocumentRevision updated = ds.updateDocumentFromRevision(update);
 
 // Read a document
-DocumentRevision aRevision = ds.getDocument(revision.getId());
+BasicDocumentRevision aRevision = ds.getDocument(updated.getId());
 ```
 
 Read more in [the CRUD document](https://github.com/cloudant/sync-android/blob/master/doc/crud.md).
@@ -162,7 +201,7 @@ is described in [the events documentation](https://github.com/cloudant/sync-andr
 Replication is used to synchronise data between the local datastore and a
 remote database, either a CouchDB instance or a Cloudant database. Many
 datastores can replicate with the same remote database, meaning that
-cross-device syncronisation is acheived by setting up replications from each
+cross-device synchronisation is achieved by setting up replications from each
 device the the remote database.
 
 Replication is simple to get started in the common cases:
@@ -175,7 +214,7 @@ URI uri = new URI("https://apikey:apipasswd@username.cloudant.com/my_database");
 Datastore ds = manager.openDatastore("my_datastore");
 
 // Replicate from the local to remote database
-Replicator replicator = ReplicatorFactory.oneway(ds, uri);
+Replicator replicator = ReplicatorBuilder.push().from(ds).to(uri).build();
 
 // Fire-and-forget (there are easy ways to monitor the state too)
 replicator.start();
@@ -190,17 +229,21 @@ efficient ways of finding them. We've added an easy-to-use querying API. Once
 the appropriate indexes are set up, querying is as follows:
 
 ```java
-QueryBuilder query = new QueryBuilder();
-query.index("name").equalTo("John");
-query.index("age").greaterThan(25);
+Map<String, Object> query = new HashMap<String, Object>();
+query.put("name", "mike");
+query.put("pet", "cat");
+QueryResult result = indexManager.find(query);
 
-QueryResult result = indexManager.query(query.build());
 for (DocumentRevision revision : result) {
     // do something
 }
 ```
 
-See [Index and Querying Data](https://github.com/cloudant/sync-android/blob/master/doc/index-querying.md).
+See [Index and Querying Data](https://github.com/cloudant/sync-android/blob/master/doc/query.md).
+
+For information about migrating your legacy indexing/query code to the new Cloudant Query - Android implementation.
+
+See [Index and Querying Migration](https://github.com/cloudant/sync-android/blob/master/doc/query-migration.md)
 
 ### Conflicts
 
@@ -220,6 +263,18 @@ back to full health.
 
 Learn more about this essential process in the
 [conflicts documentation](https://github.com/cloudant/sync-android/blob/master/doc/conflicts.md).
+
+## Known Issues
+
+Some users on certain older versions of Android have reported the
+following exception:
+
+`java.lang.NoClassDefFoundError: javax/annotation/Nullable`
+
+To fix this issue, add the following dependency to your application's
+`build.gradle`:
+
+`compile 'com.google.code.findbugs:jsr305:3.0.0'`
 
 ## Contributors
 

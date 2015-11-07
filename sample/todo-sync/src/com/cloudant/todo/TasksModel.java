@@ -1,16 +1,18 @@
-package com.cloudant.todo;
+/**
+ * Copyright (c) 2015 Cloudant, Inc. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+ * except in compliance with the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the
+ * License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific language governing permissions
+ * and limitations under the License.
+ */
 
-import com.cloudant.sync.datastore.ConflictException;
-import com.cloudant.sync.datastore.Datastore;
-import com.cloudant.sync.datastore.DatastoreManager;
-import com.cloudant.sync.datastore.DocumentBodyFactory;
-import com.cloudant.sync.datastore.BasicDocumentRevision;
-import com.cloudant.sync.datastore.MutableDocumentRevision;
-import com.cloudant.sync.notifications.ReplicationCompleted;
-import com.cloudant.sync.notifications.ReplicationErrored;
-import com.cloudant.sync.replication.Replicator;
-import com.cloudant.sync.replication.ReplicatorFactory;
-import com.google.common.eventbus.Subscribe;
+package com.cloudant.todo;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -19,13 +21,25 @@ import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
-import java.io.IOException;
-import java.lang.RuntimeException;
-import java.util.ArrayList;
+import com.cloudant.sync.datastore.BasicDocumentRevision;
+import com.cloudant.sync.datastore.ConflictException;
+import com.cloudant.sync.datastore.Datastore;
+import com.cloudant.sync.datastore.DatastoreManager;
+import com.cloudant.sync.datastore.DatastoreNotCreatedException;
+import com.cloudant.sync.datastore.DocumentBodyFactory;
+import com.cloudant.sync.datastore.DocumentException;
+import com.cloudant.sync.datastore.MutableDocumentRevision;
+import com.cloudant.sync.notifications.ReplicationCompleted;
+import com.cloudant.sync.notifications.ReplicationErrored;
+import com.cloudant.sync.replication.Replicator;
+import com.cloudant.sync.replication.ReplicatorBuilder;
+import com.google.common.eventbus.Subscribe;
+
 import java.io.File;
-import java.util.List;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -38,7 +52,7 @@ class TasksModel {
     private static final String DATASTORE_MANGER_DIR = "data";
     private static final String TASKS_DATASTORE_NAME = "tasks";
 
-    private final Datastore mDatastore;
+    private Datastore mDatastore;
 
     private Replicator mPushReplicator;
     private Replicator mPullReplicator;
@@ -58,7 +72,11 @@ class TasksModel {
                 Context.MODE_PRIVATE
         );
         DatastoreManager manager = new DatastoreManager(path.getAbsolutePath());
-        this.mDatastore = manager.openDatastore(TASKS_DATASTORE_NAME);
+        try {
+            this.mDatastore = manager.openDatastore(TASKS_DATASTORE_NAME);
+        } catch (DatastoreNotCreatedException dnce) {
+            Log.e(LOG_TAG, "Unable to open Datastore", dnce);
+        }
 
         Log.d(LOG_TAG, "Set up database at " + path.getAbsolutePath());
 
@@ -103,8 +121,7 @@ class TasksModel {
         try {
             BasicDocumentRevision created = this.mDatastore.createDocumentFromRevision(rev);
             return Task.fromRevision(created);
-        } catch (IOException ioe) {
-            // we're not dealing with attachments, so we can safely ignore this exception
+        } catch (DocumentException de) {
             return null;
         }
     }
@@ -122,8 +139,7 @@ class TasksModel {
         try {
             BasicDocumentRevision updated = this.mDatastore.updateDocumentFromRevision(rev);
             return Task.fromRevision(updated);
-        } catch (IOException ioe) {
-            // we're not dealing with attachments, so we can safely ignore this exception
+        } catch (DocumentException de) {
             return null;
         }
     }
@@ -218,10 +234,10 @@ class TasksModel {
         // Set up the new replicator objects
         URI uri = this.createServerURI();
 
-        mPushReplicator = ReplicatorFactory.oneway(mDatastore, uri);
-        mPushReplicator.getEventBus().register(this);
+        mPullReplicator = ReplicatorBuilder.pull().to(mDatastore).from(uri).build();
+        mPushReplicator = ReplicatorBuilder.push().from(mDatastore).to(uri).build();
 
-        mPullReplicator = ReplicatorFactory.oneway(uri, mDatastore);
+        mPushReplicator.getEventBus().register(this);
         mPullReplicator.getEventBus().register(this);
 
         Log.d(LOG_TAG, "Set up replicators for URI:" + uri.toString());

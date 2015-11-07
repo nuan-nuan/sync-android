@@ -1,3 +1,155 @@
+# 0.14.0 (2015-11-3)
+- [BREAKING CHANGE] Removed `setCustomHeaders` from `CouchConfig`. See
+  [Http Interceptors](https://github.com/cloudant/sync-android/blob/master/doc/interceptors.md)
+  for a code sample which shows how to add custom request headers
+  using an HTTP Request Interceptor.
+- [NEW] Added replication policies, allowing users to easily create policies such as "Replicate
+   every 2 hours, only when on Wifi". See the [Replication Policies User Guide](REPLICATION_POLICIES.md).
+- [IMPROVED] Replication reliability when transferring data over unreliable
+  networks.
+
+# 0.13.4 (2015-09-29)
+- [FIXED] Issue where HTTP Interceptors would not be executed for `_revs_diff`
+requests.
+
+
+# 0.13.3 (2015-08-23)
+- [FIXED] Issue where the `ReplicatorBuilder` would not handle HTTP interceptors
+  correctly for push replications.
+
+# 0.13.2 (2015-08-28)
+- [FIXED] Issue where document IDs containing colons were not properly encoded during replication
+
+# 0.13.1 (2015-08-17)
+- [FIXED] Fix issue where the `ReplictorBuilder` would crash the application
+when creating a pull replication if `PullFilter` is `null`.
+
+# 0.13.0 (2015-08-13)
+- [BREAKING CHANGE] Moved code for encryption on Android to the
+  `sync-android-encryption` subproject. See the instructions in the [README](https://github.com/cloudant/sync-android/blob/master/README.md)
+  file for how to include `sync-android-encryption` in your project.
+- [BREAKING CHANGE] Removed Configuration options from `CouchConfig` which are not used
+   by the HTTP Layer. See commit [815026c](https://github.com/cloudant/sync-android/commit/815026c14caf86a8cbb105af0b30f7fb73a46871)
+   for details.
+- [FIX] Fixed issue where at least one index had to be created before a query would execute.  
+  You can now query for documents without the existence of any indexes.
+- [NEW] New fields `documentsReplicated` and `batchesReplicated` added
+  to ReplicationCompleted class
+- [NEW] New `ReplicatorBuilder` API. This should be used to create replications in the future.
+- [NEW] HTTP Interceptor API. See [Http Interceptors](https://github.com/cloudant/sync-android/blob/master/doc/interceptors.md) for details.
+- [DEPRECATED] Deprecated the  following classes: `ReplicatorFactory`, `Replication`,
+  `PullReplication` and `PushReplication`.
+
+# 0.12.3 (2015-06-30)
+
+- [FIXED] Fixed issue with the encoding of local document URIs
+- [FIXED] Fixed issue where sync-android would select a different
+  winning revision than CouchDB for the same revision tree.
+
+# 0.12.2 (2015-06-25)
+
+- [NEW] Added query support for the `$mod` operator.
+- [NEW] Added query support for the `$size` operator.
+- [NEW] Added CachingKeyProvider, which can be used to improve performance in
+  some situations.
+- [FIXED] Fixed issue where documents with an empty array value would not be
+  indexed
+- [FIXED] Fixed issue where AES encryption keys were not created correctly on
+  android lower than API level 19
+
+# 0.12.1 (2015-06-12)
+
+- [FIX] Fixed issue where Base64 encoded strings for HTTP basic authentication
+  could contain line breaks.
+- [FIX] Custom headers set by overriding getCouchConfig in Replication classes
+  were not set on HTTP requests
+
+
+# 0.12.0 (2015-06-11)
+
+- [NEW] Encryption of all data is now supported using 256-bit AES:
+  JSON documents, Query indexes and attachments. See
+  [encryption documentation](https://github.com/cloudant/sync-android/blob/master/doc/encryption.md)
+  for details.
+- [NEW] Added query text search support.  See
+  [query documentation](https://github.com/cloudant/sync-android/blob/master/doc/query.md)
+  for details.
+- [NEW] Use HttpURLConnection instead of Apache HttpClient to
+  significantly reduce dependency footprint.
+- [FIX] Fix issues with database compaction.
+- [FIX] Fixed encoding of `+` characters in query strings.
+- [REMOVED] Removed `oneway` methods from ReplicatorFactory. Users
+  should use the method described in the
+  [replication documentation](https://github.com/cloudant/sync-android/blob/master/doc/replication.md)
+  instead.
+- [NEW] Added query support for the `$mod` operator.
+
+# 0.11.0 (2015-04-22)
+
+- [FIX] Using MongoDB query as the "gold" standard, query support for
+  `NOT` has been fixed to return result sets correctly (as in MongoDB
+  query).  Previously, the result set from a query like `{ "pet": {
+  "$not" { "$eq": "dog" } } }` would include a document like `{
+  "pet" : [ "cat", "dog" ], ... }` because the array contains an
+  object that isn't `dog`.  The new behavior is that `$not` now
+  inverts the result set, so this document will no longer be included
+  because it has an array element that matches `dog`.
+- [BREAKING CHANGE] Changed local document APIs. createLocalDocument
+  and updateLocalDocument have been removed and replaced by
+  insertLocalDocument. The return type of getLocalDocument has been
+  changed to LocalDocument.
+- [NEW] getVersion API added to SQLDatabaseQueue
+- [NEW] Datastore will not be created if the database version is not
+  supported by the version of the library opening it.
+- [REMOVED] Removed legacy indexing/query code.  Users should instead
+  use the new Cloudant Query - Mobile functionality.  A
+  [migration document](https://github.com/cloudant/sync-android/tree/master/doc/query-migration.md)
+  exists for users that need to transition from the legacy
+  implementation to the new one.
+- [FIX] Fix attachment handling error which could cause push
+  replications to fail in some circumstances
+
+# 0.10.0 (2015-02-16)
+
+- [NEW] Added `listAllDatastores` method to `DatastoreManager`.
+- [BREAKING CHANGE] Introduce Checked exceptions for recoverable error
+  conditions, these new checked exceptions are on the Datastore
+  interface and its implementing classes. See the
+  [commit](https://github.com/cloudant/sync-android/commit/e6d4f685cefe9c06a9c9372723d9cc06dbc7e978)
+  for more infomation.
+- [FIX] Support CouchDB 2.0/Cloudant Local's array-based
+  sequence number format to fix replication between the local
+  database and these remote servers.
+- [FIX] Fixed issue where the path portion for remote database
+  URLs were incorrectly encoded if there was more than one
+  path segment.
+- [IMPROVED] SQLite connections are now reused across threads by
+  using a serial queue to enforce isolation. This should be more
+  robust and allows us to properly implement the `close()` method
+  on a datastore.
+- [REMOVED] Removed username and password from `PullReplication` and
+  `PushReplication`. Users should set their password in the source or
+  destnation URL.
+- [REMOVED] Removed allDbs() from Mazha CouchClient.
+
+# 0.9.3 (2014-12-10)
+
+- [FIX] Fixed issue where slashes were disallowed for replication.
+- [FIX] Fixed issue where deleted documents were returned for conflicts.
+- [NEW] Added compact API.
+
+# 0.9.2 (2014-11-26)
+
+- [FIX] Fixed a build issue with 0.9.1. The jars for 0.9.1 were built
+  incorrectly, causing Android users to experience the error
+  'Error:duplicate files during packaging of APK'
+
+# 0.9.1 (2014-11-21)
+
+- [Upgraded] Upgraded SQLite4java to version 1.0.392
+- [FIX] Fixed issue where resurrected documents where handled in correctly
+- [FIX] Fixed dataloss issue where conflicted document attachments were lost
+
 # 0.9.0 (2014-10-9)
 
 - [REMOVED] Removed deprecated APIs
@@ -6,9 +158,9 @@
 - [FIX] Fixed issue  where regexp for database names was too restrictive
 - [FIX] Fixed indexmanager bug which prevented fields with certain names being indexed
 - [FIX] Fixed issues where sqlite connections were not being closed correctly
-- [NEW] Added proguard example configuration file 
+- [NEW] Added proguard example configuration file
 
-# 0.7.1 (2014-08-26) 
+# 0.7.1 (2014-08-26)
 
 - [NEW] A new CRUD and Attachments API has been introduced. See
   doc/crud.md for details, along with a cookbook on using the new API.
